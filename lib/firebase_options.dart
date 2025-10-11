@@ -4,6 +4,16 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
+/// Default [FirebaseOptions] for use with your Firebase apps.
+///
+/// Example:
+/// ```dart
+/// import 'firebase_options.dart';
+/// // ...
+/// await Firebase.initializeApp(
+///   options: DefaultFirebaseOptions.currentPlatform,
+/// );
+/// ```
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -17,17 +27,17 @@ class DefaultFirebaseOptions {
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
-              'you can reconfigure this by running the FlutterFire CLI again.',
+          'you can reconfigure this by running the FlutterFire CLI again.',
         );
       case TargetPlatform.windows:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for windows - '
-              'you can reconfigure this by running the FlutterFire CLI again.',
+          'you can reconfigure this by running the FlutterFire CLI again.',
         );
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
-              'you can reconfigure this by running the FlutterFire CLI again.',
+          'you can reconfigure this by running the FlutterFire CLI again.',
         );
       default:
         throw UnsupportedError(
@@ -37,18 +47,17 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'YOUR_WEB_API_KEY', // Replace with your web app's API key
-    appId: 'YOUR_WEB_APP_ID',   // Replace with your web app's App ID
+    apiKey: 'AIzaSyAAqoNdfpQW4dWzOFHLZbAeSFK-LcpMeoQ',
+    appId: '1:568825990941:web:15c407b55d9baa22ca1bf4',
     messagingSenderId: '568825990941',
     projectId: 'budgetmate-3bd70',
     authDomain: 'budgetmate-3bd70.firebaseapp.com',
     storageBucket: 'budgetmate-3bd70.firebasestorage.app',
-    measurementId: 'YOUR_MEASUREMENT_ID', // Optional, for Firebase Analytics
   );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyAGvetaiuIKgSBC_7ns9KKILqg84LpX7nk',
-    appId: '1:568825990941:android:0cd8f3a6e8765de9ca1bf4',
+    appId: '1:568825990941:android:dbe49bafeaefc143ca1bf4',
     messagingSenderId: '568825990941',
     projectId: 'budgetmate-3bd70',
     storageBucket: 'budgetmate-3bd70.firebasestorage.app',
@@ -56,10 +65,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyDVNIs-KCeKcWVMwYyqBp5Ryn0T_QLW5jU',
-    appId: '1:568825990941:ios:b51b86c71b8f0e42ca1bf4',
+    appId: '1:568825990941:ios:61b7bd9c4f508be5ca1bf4',
     messagingSenderId: '568825990941',
     projectId: 'budgetmate-3bd70',
     storageBucket: 'budgetmate-3bd70.firebasestorage.app',
-    iosBundleId: 'com.example.budgetMate',
+    iosBundleId: 'com.example.budgetmate',
   );
+
 }

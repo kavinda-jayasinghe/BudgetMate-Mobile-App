@@ -10,9 +10,15 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
+
+  # Firebase and Cloud Firestore
   firebase_core: ^3.6.0
+  firebase_auth: ^5.2.1  # For user authentication
   cloud_firestore: ^5.4.1
-  intl: ^0.19.0
+  intl: ^0.19.0  # For handling date and time
+
+  # State management (optional if you're using Riverpod)
+  flutter_riverpod: ^2.5.1
 
 dev_dependencies:
   flutter_test:

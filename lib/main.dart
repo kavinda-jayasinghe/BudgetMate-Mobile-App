@@ -1,26 +1,28 @@
-import 'package:firebase_core/firebase_core.dart';
+import 'package:budget_mate/firebase_options.dart';
+import 'package:budget_mate/qauth_page.dart';
+import 'package:budget_mate/screens/auth_page.dart';
 import 'package:flutter/material.dart';
-import 'firebase_options.dart';
-import 'home.dart';
+import 'package:firebase_core/firebase_core.dart';
 
-Future<void> main() async {
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const MyApp());
+  runApp(const ExpenseTrackerApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class ExpenseTrackerApp extends StatelessWidget {
+  const ExpenseTrackerApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Budget Mate',
+      title: 'Flutter Firebase Auth',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
+        colorSchemeSeed: Colors.indigo,
       ),
-      home: const Home(),
+      home: const AuthPage(),
     );
   }
 }
