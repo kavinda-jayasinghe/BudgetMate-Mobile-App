@@ -1,5 +1,4 @@
 import 'package:budget_mate/firebase_options.dart';
-import 'package:budget_mate/qauth_page.dart';
 import 'package:budget_mate/screens/auth_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';

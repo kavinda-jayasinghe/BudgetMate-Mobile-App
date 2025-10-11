@@ -1,7 +1,8 @@
+import 'package:budget_mate/screens/auth_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'auth_page.dart';
-import 'package:intl/intl.dart'; // To format the date
+import 'add_expense_screen.dart'; // Import the AddExpenseScreen
+import 'package:intl/intl.dart';  // To format the date
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -12,16 +13,15 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   DateTime _selectedDate = DateTime.now();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Navigate to previous month
+  // Method to navigate to the previous month
   void _previousMonth() {
     setState(() {
       _selectedDate = DateTime(_selectedDate.year, _selectedDate.month - 1);
     });
   }
 
-  // Navigate to next month
+  // Method to navigate to the next month
   void _nextMonth() {
     setState(() {
       _selectedDate = DateTime(_selectedDate.year, _selectedDate.month + 1);
@@ -30,7 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = _auth.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
       appBar: AppBar(
@@ -40,7 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              await _auth.signOut();
+              await FirebaseAuth.instance.signOut();
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => const AuthPage()),
@@ -103,10 +103,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      // Floating + Button to add Expense/Income (you can implement later)
+      // Floating + Button to add Expense/Income
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // TODO: Open Add Expense/Income Page
+          // Navigate to Add Expense Screen
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddExpenseScreen()),
+          );
         },
         child: const Icon(Icons.add),
       ),
