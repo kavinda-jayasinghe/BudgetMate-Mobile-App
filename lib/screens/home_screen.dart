@@ -1,8 +1,10 @@
+// home_screen.dart
 import 'package:budget_mate/screens/auth_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'add_expense_screen.dart'; // Import the AddExpenseScreen
-import 'package:intl/intl.dart';  // To format the date
+import 'add_expense_screen.dart';
+import 'transaction_list.dart'; // Import the new TransactionList widget
+import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -34,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Home Page'),
+        title: const Text('Budget Mate'),
         centerTitle: true,
         actions: [
           IconButton(
@@ -55,20 +57,17 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Previous month button
                 IconButton(
                   icon: const Icon(Icons.arrow_left),
                   onPressed: _previousMonth,
                 ),
-
-                // Display Month & Year
                 Text(
                   DateFormat.yMMMM().format(_selectedDate),
                   style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold),
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-
-                // Next month button
                 IconButton(
                   icon: const Icon(Icons.arrow_right),
                   onPressed: _nextMonth,
@@ -78,35 +77,23 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      body: Center(
-        child: Column(
-          children: [
-            const SizedBox(height: 16),
-            // Welcome message
-            Text(
-              user != null
-                  ? 'Welcome, ${user.email}'
-                  : 'You are not logged in',
-              style: const TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 16),
-
-            // Placeholder for history / transaction list
-            Expanded(
-              child: Center(
-                child: Text(
-                  'Transactions for ${DateFormat.yMMMM().format(_selectedDate)}',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ),
-            ),
-          ],
-        ),
+      body: Column(
+        children: [
+          const SizedBox(height: 16),
+          Text(
+            user != null
+                ? 'Welcome, ${user.email}'
+                : 'You are not logged in',
+            style: const TextStyle(fontSize: 16),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: TransactionList(selectedDate: _selectedDate), // Use TransactionList widget
+          ),
+        ],
       ),
-      // Floating + Button to add Expense/Income
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // Navigate to Add Expense Screen
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const AddExpenseScreen()),

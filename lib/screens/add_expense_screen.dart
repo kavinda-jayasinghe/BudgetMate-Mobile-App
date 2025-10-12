@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -19,34 +20,50 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
   bool _isExpense = true;
 
-  Future<void> _saveExpenseIncome(GlobalKey<FormState> formKey) async {
-    if (formKey.currentState!.validate()) {
-      final amount = double.parse(_amountController.text);
-      final category = _categoryController.text;
-      final note = _noteController.text;
-      final type = _isExpense ? 'expense' : 'income';
+Future<void> _saveExpenseIncome(GlobalKey<FormState> formKey) async {
+  if (formKey.currentState!.validate()) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to save transactions')),
+      );
+      return;
+    }
 
-      try {
-        await FirebaseFirestore.instance.collection('transactions').add({
-          'amount': amount,
-          'category': category,
-          'note': note,
-          'date': Timestamp.fromDate(_selectedDate),
-          'type': type,
-        });
+    final amount = double.tryParse(_amountController.text);
+    if (amount == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid amount entered')),
+      );
+      return;
+    }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Transaction added successfully!')),
-        );
+    final category = _categoryController.text;
+    final note = _noteController.text;
+    final type = _isExpense ? 'expense' : 'income';
 
-        Navigator.pop(context);
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
+    try {
+      await FirebaseFirestore.instance.collection('transactions').add({
+        'amount': amount,
+        'category': category,
+        'note': note,
+        'date': Timestamp.fromDate(_selectedDate),
+        'type': type,
+        'userId': user.uid, // Add userId to filter transactions
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Transaction added successfully!')),
+      );
+
+      Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
     }
   }
+}
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(

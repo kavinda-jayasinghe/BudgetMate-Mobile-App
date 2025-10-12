@@ -1,5 +1,7 @@
+// add_expense_income_dialog.dart
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';  // Import Firestore
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AddExpenseIncomeDialog extends StatefulWidget {
   final DateTime selectedDate;
@@ -21,7 +23,15 @@ class _AddExpenseIncomeDialogState extends State<AddExpenseIncomeDialog> {
   final _categoryController = TextEditingController();
   final _noteController = TextEditingController();
 
-  bool _isExpense = true; // Switch between Expense and Income
+  bool _isExpense = true;
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _categoryController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +42,6 @@ class _AddExpenseIncomeDialogState extends State<AddExpenseIncomeDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Expense/Income Toggle Tabs
             ToggleButtons(
               isSelected: [_isExpense, !_isExpense],
               onPressed: (int index) {
@@ -43,8 +52,6 @@ class _AddExpenseIncomeDialogState extends State<AddExpenseIncomeDialog> {
               children: const [Text('Expense'), Text('Income')],
             ),
             const SizedBox(height: 12),
-
-            // Amount
             TextFormField(
               controller: _amountController,
               keyboardType: TextInputType.number,
@@ -53,12 +60,13 @@ class _AddExpenseIncomeDialogState extends State<AddExpenseIncomeDialog> {
                 if (value == null || value.isEmpty) {
                   return 'Please enter an amount';
                 }
+                if (double.tryParse(value) == null) {
+                  return 'Enter a valid number';
+                }
                 return null;
               },
             ),
             const SizedBox(height: 12),
-
-            // Category
             TextFormField(
               controller: _categoryController,
               decoration: const InputDecoration(labelText: 'Category'),
@@ -70,8 +78,6 @@ class _AddExpenseIncomeDialogState extends State<AddExpenseIncomeDialog> {
               },
             ),
             const SizedBox(height: 12),
-
-            // Note
             TextFormField(
               controller: _noteController,
               decoration: const InputDecoration(labelText: 'Note'),
@@ -89,23 +95,50 @@ class _AddExpenseIncomeDialogState extends State<AddExpenseIncomeDialog> {
         TextButton(
           onPressed: () async {
             if (_formKey.currentState!.validate()) {
-              final amount = double.parse(_amountController.text);
+              final user = FirebaseAuth.instance.currentUser;
+              if (user == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please log in to save transactions')),
+                );
+                return;
+              }
+
+              final amount = double.tryParse(_amountController.text);
+              if (amount == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Invalid amount entered')),
+                );
+                return;
+              }
+
               final category = _categoryController.text;
               final note = _noteController.text;
 
-              // Save the Expense/Income to Firestore
-              await FirebaseFirestore.instance.collection('transactions').add({
-                'amount': amount,
-                'category': category,
-                'note': note,
-                'date': widget.selectedDate,  // Store selected date
-                'type': _isExpense ? 'expense' : 'income', // Expense or income type
-              });
+              try {
+                await FirebaseFirestore.instance.collection('transactions').add({
+                  'amount': amount,
+                  'category': category,
+                  'note': note,
+                  'date': Timestamp.fromDate(widget.selectedDate), // Store as Timestamp
+                  'type': _isExpense ? 'expense' : 'income',
+                  'userId': user.uid, // Add userId
+                });
 
-              // Notify the parent widget (HomeScreen)
-              widget.onSave(category, amount, note);
+                widget.onSave(category, amount, note);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Transaction added successfully!')),
+                );
 
-              Navigator.pop(context);
+                _amountController.clear();
+                _categoryController.clear();
+                _noteController.clear();
+
+                Navigator.pop(context);
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e')),
+                );
+              }
             }
           },
           child: const Text('Save'),
