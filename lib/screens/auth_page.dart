@@ -85,7 +85,7 @@ class _AuthPageState extends State<AuthPage> {
           length: 2,
           child: Scaffold(
             appBar: AppBar(
-              title: const Text('Firebase Auth Demo'),
+              title: const Text('Welcome to Budget Mate '),
               bottom: const TabBar(
                 tabs: [
                   Padding(

@@ -147,11 +147,11 @@ Future<void> updateTransactionsWithUserIdAndDate() async {
       ),
       body: Column(
         children: [
-          const SizedBox(height: 16),
-          Text(
-            user != null ? 'Welcome, ${user.email}' : 'You are not logged in',
-            style: const TextStyle(fontSize: 16),
-          ),
+          // const SizedBox(height: 16),
+          // Text(
+          //   user != null ? 'Welcome, ${user.email}' : 'You are not logged in',
+          //   style: const TextStyle(fontSize: 16),
+          // ),
           const SizedBox(height: 16),
           Expanded(
             child: TransactionList(selectedDate: _selectedDate),
