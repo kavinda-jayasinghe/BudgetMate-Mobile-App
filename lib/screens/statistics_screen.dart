@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:connectivity_plus/connectivity_plus.dart'; // For offline check
 
 class StatisticsScreen extends StatefulWidget {
   final DateTime selectedDate;
@@ -10,7 +11,7 @@ class StatisticsScreen extends StatefulWidget {
   const StatisticsScreen({super.key, required this.selectedDate});
 
   @override
-  _StatisticsScreenState createState() => _StatisticsScreenState();
+  State<StatisticsScreen> createState() => _StatisticsScreenState();
 }
 
 class _StatisticsScreenState extends State<StatisticsScreen> {
@@ -19,18 +20,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   bool isLoading = true;
   String errorMessage = '';
 
-  // Vibrant color palette for pie charts
   final List<Color> colors = [
-    Colors.blue,
-    Colors.red,
-    Colors.green,
-    Colors.orange,
-    Colors.purple,
-    Colors.teal,
-    Colors.pink,
-    Colors.amber,
-    Colors.cyan,
-    Colors.lime,
+    Colors.blue, Colors.red, Colors.green, Colors.orange,
+    Colors.purple, Colors.teal, Colors.pink, Colors.amber,
+    Colors.cyan, Colors.lime,
   ];
 
   @override
@@ -58,7 +51,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           .where('userId', isEqualTo: user.uid)
           .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
           .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
-          .orderBy('date', descending: true) // Added to match TransactionList index
+          .orderBy('date', descending: true)
           .get();
 
       final expenseTotals = <String, double>{};
@@ -83,12 +76,56 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         isLoading = false;
       });
     } catch (e) {
+      print('StatisticsScreen: Firestore error: $e'); // Debug log
       setState(() {
         errorMessage = 'Error loading statistics: $e';
         isLoading = false;
       });
-      print('Firestore error: $e'); // Log error for debugging
+      // If it's an index error, show helpful message
+      if (e.toString().contains('FAILED_PRECONDITION') || e.toString().contains('index')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Query requires an index. Check console for link to create it.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
     }
+  }
+
+  Widget _buildPieChart(Map<String, double> data, String title, Color titleColor) {
+    if (data.isEmpty) {
+      return const Center(child: Text('No data for this month', style: TextStyle(fontSize: 16)));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: titleColor)),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 300,
+          child: PieChart(
+            PieChartData(
+              sections: data.entries.toList().asMap().entries.map((entry) {
+                final index = entry.key;
+                final category = entry.value.key;
+                final amount = entry.value.value;
+                return PieChartSectionData(
+                  value: amount,
+                  title: '$category\n\$${amount.toStringAsFixed(0)}',
+                  color: colors[index % colors.length],
+                  radius: 100,
+                  titleStyle: const TextStyle(fontSize: 12, color: Colors.white),
+                );
+              }).toList(),
+              sectionsSpace: 2,
+              centerSpaceRadius: 50,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -110,14 +147,15 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(errorMessage, style: const TextStyle(color: Colors.red)),
-                      if (errorMessage.contains('FAILED_PRECONDITION')) ...[
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Please check the console for the index creation link.',
-                          style: TextStyle(fontSize: 12, color: Colors.red),
-                          textAlign: TextAlign.center,
+                      if (errorMessage.contains('FAILED_PRECONDITION') || errorMessage.contains('index'))
+                        const Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Text(
+                            'This is an index error. Check the debug console for a link to create the required index in Firebase.',
+                            style: TextStyle(fontSize: 14, color: Colors.orange),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
-                      ],
                     ],
                   ),
                 )
@@ -126,63 +164,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Expenses by Category',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blueAccent),
-                      ),
-                      const SizedBox(height: 16),
-                      expenseData.isEmpty
-                          ? const Center(child: Text('No expenses for this month', style: TextStyle(fontSize: 16)))
-                          : SizedBox(
-                              height: 300,
-                              child: PieChart(
-                                PieChartData(
-                                  sections: expenseData.entries.toList().asMap().entries.map((entry) {
-                                    final index = entry.key;
-                                    final category = entry.value.key;
-                                    final amount = entry.value.value;
-                                    return PieChartSectionData(
-                                      value: amount,
-                                      title: '$category\n\$${amount.toStringAsFixed(2)}',
-                                      color: colors[index % colors.length],
-                                      radius: 100,
-                                      titleStyle: const TextStyle(fontSize: 12, color: Colors.white),
-                                    );
-                                  }).toList(),
-                                  sectionsSpace: 2,
-                                  centerSpaceRadius: 50,
-                                ),
-                              ),
-                            ),
+                      _buildPieChart(expenseData, 'Expenses by Category', Colors.blueAccent),
                       const SizedBox(height: 32),
-                      const Text(
-                        'Income by Category',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
-                      ),
-                      const SizedBox(height: 16),
-                      incomeData.isEmpty
-                          ? const Center(child: Text('No income for this month', style: TextStyle(fontSize: 16)))
-                          : SizedBox(
-                              height: 300,
-                              child: PieChart(
-                                PieChartData(
-                                  sections: incomeData.entries.toList().asMap().entries.map((entry) {
-                                    final index = entry.key;
-                                    final category = entry.value.key;
-                                    final amount = entry.value.value;
-                                    return PieChartSectionData(
-                                      value: amount,
-                                      title: '$category\n\$${amount.toStringAsFixed(2)}',
-                                      color: colors[index % colors.length],
-                                      radius: 100,
-                                      titleStyle: const TextStyle(fontSize: 12, color: Colors.white),
-                                    );
-                                  }).toList(),
-                                  sectionsSpace: 2,
-                                  centerSpaceRadius: 50,
-                                ),
-                              ),
-                            ),
+                      _buildPieChart(incomeData, 'Income by Category', Colors.green),
                     ],
                   ),
                 ),

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'add_expense_screen.dart';
+import 'statistics_screen.dart';
 
 class TransactionList extends StatelessWidget {
   final DateTime selectedDate;
@@ -33,6 +34,21 @@ class TransactionList extends StatelessWidget {
           appBar: AppBar(
             title: const Text('Your Transactions'),
             backgroundColor: Colors.indigo,
+            actions: [
+              // ----------- STATISTICS ICON BUTTON -----------
+              IconButton(
+                icon: const Icon(Icons.bar_chart, color: Colors.white),
+                tooltip: 'View Statistics',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => StatisticsScreen(selectedDate: selectedDate),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
           floatingActionButton: FloatingActionButton(
             backgroundColor: Colors.indigo,
