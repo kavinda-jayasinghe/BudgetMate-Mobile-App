@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'add_expense_screen.dart';
 import 'statistics_screen.dart';
 import 'auth_page.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class TransactionList extends StatefulWidget {
   final DateTime selectedDate;
@@ -22,7 +23,6 @@ class _TransactionListState extends State<TransactionList> {
   @override
   void initState() {
     super.initState();
-    // Initialize with current month if widget.selectedDate is null or invalid
     _selectedDate = DateTime(widget.selectedDate.year, widget.selectedDate.month, 1);
     print('TransactionList: Initialized with $_selectedDate'); // Debug
   }
@@ -62,6 +62,34 @@ class _TransactionListState extends State<TransactionList> {
     }
   }
 
+  void _showReceiptDialog(String? receiptUrl) {
+    if (receiptUrl == null) return;
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: CachedNetworkImage(
+                imageUrl: receiptUrl,
+                height: 300,
+                fit: BoxFit.contain,
+                placeholder: (context, url) => const CircularProgressIndicator(),
+                errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.red),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -84,16 +112,7 @@ class _TransactionListState extends State<TransactionList> {
         return Scaffold(
           appBar: AppBar(
             backgroundColor: Colors.indigo,
-                title: const Text(
-            'Budget Mate',
-              style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
-               ),
-             ),
             actions: [
-              // Statistics Icon
               IconButton(
                 icon: const Icon(Icons.pie_chart, color: Colors.white),
                 tooltip: 'View Statistics',
@@ -107,7 +126,6 @@ class _TransactionListState extends State<TransactionList> {
                   );
                 },
               ),
-              // Logout Icon
               IconButton(
                 icon: const Icon(Icons.logout, color: Colors.white),
                 tooltip: 'Sign Out',
@@ -129,7 +147,6 @@ class _TransactionListState extends State<TransactionList> {
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Month Selector
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: Row(
@@ -222,6 +239,7 @@ class _TransactionListState extends State<TransactionList> {
                         final note = data['note'] as String? ?? '';
                         final date = (data['date'] as Timestamp?)?.toDate() ?? DateTime.now();
                         final type = data['type'] as String? ?? 'unknown';
+                        final receiptUrl = data['receiptUrl'] as String?;
 
                         return Card(
                           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -230,12 +248,23 @@ class _TransactionListState extends State<TransactionList> {
                             subtitle: Text(
                               '${note.isNotEmpty ? '$note - ' : ''}${DateFormat.yMMMd().format(date)}',
                             ),
-                            trailing: Text(
-                              '${type == 'expense' ? '-' : '+'}\$${amount.toStringAsFixed(2)}',
-                              style: TextStyle(
-                                color: type == 'expense' ? Colors.red : Colors.green,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (receiptUrl != null)
+                                  IconButton(
+                                    icon: const Icon(Icons.receipt, color: Colors.blue),
+                                    onPressed: () => _showReceiptDialog(receiptUrl),
+                                    tooltip: 'View Receipt',
+                                  ),
+                                Text(
+                                  '${type == 'expense' ? '-' : '+'}\$${amount.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    color: type == 'expense' ? Colors.red : Colors.green,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         );

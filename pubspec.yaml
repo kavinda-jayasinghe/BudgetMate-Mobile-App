@@ -9,9 +9,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  shared_preferences: ^2.3.2  
+  image_picker: ^1.1.2
   cupertino_icons: ^1.0.8
   firebase_core: ^4.1.1
   firebase_auth: ^6.1.0
+  firebase_storage: ^13.0.3
   cloud_firestore: ^6.0.2
   intl: ^0.20.2
   flutter_riverpod: ^3.0.3
@@ -19,9 +22,9 @@ dependencies:
   uuid: ^4.0.0
   http: ^1.0.0
   flutter_local_notifications: ^17.0.0
-  fl_chart: ^0.69.0
-  connectivity_plus: ^6.0.3 # Added for offline connectivity checking
-  shared_preferences: ^2.2.2 # Added for local storage backup
+  fl_chart: ^0.69.0 # Added for pie charts
+  cached_network_image: ^3.3.1
+  connectivity_plus: ^6.0.3
 
 dev_dependencies:
   flutter_test:
