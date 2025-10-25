@@ -1,13 +1,17 @@
+import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'transaction_list.dart';
 
 class AddExpenseScreen extends StatefulWidget {
   const AddExpenseScreen({super.key});
 
   @override
-  _AddExpenseScreenState createState() => _AddExpenseScreenState();
+  State<AddExpenseScreen> createState() => _AddExpenseScreenState();
 }
 
 class _AddExpenseScreenState extends State<AddExpenseScreen> {
@@ -16,125 +20,117 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   final _amountController = TextEditingController();
   final _categoryController = TextEditingController();
   final _noteController = TextEditingController();
-  final _customCategoryController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
-
   bool _isExpense = true;
-
-  // Predefined categories
-  List<String> _expenseCategories = ['Food', 'Entertainment', 'Bill', 'Transport', 'Custom'];
-  List<String> _incomeCategories = ['Salary', 'Trading', 'Vlogging', 'Custom'];
-
-  // Selected category
-  String? _selectedCategory;
 
   @override
   void initState() {
     super.initState();
-    _loadCategories(); // Load categories from Firestore
+    print('AddExpenseScreen initialized'); // Debug
+    _listenToConnectivity();
+    _syncPendingTransactions();
   }
 
-  Future<void> _loadCategories() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('categories')
-          .get();
-
-      final expenseCategories = <String>[];
-      final incomeCategories = <String>[];
-
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final name = data['name'] as String?;
-        final type = data['type'] as String?;
-        if (name != null && type != null) {
-          if (type == 'expense') {
-            expenseCategories.add(name);
-          } else if (type == 'income') {
-            incomeCategories.add(name);
-          }
-        }
+  void _listenToConnectivity() {
+    Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> result) {
+      print('Connectivity changed: $result'); // Debug
+      if (!result.contains(ConnectivityResult.none)) {
+        _syncPendingTransactions();
       }
-
-      setState(() {
-        _expenseCategories = ['Food', 'Entertainment', 'Bill', 'Transport', ...expenseCategories, 'Custom'];
-        _incomeCategories = ['Salary', 'Trading', 'Vlogging', ...incomeCategories, 'Custom'];
-        // Reset _selectedCategory if it’s invalid for the current tab
-        if (_selectedCategory != null) {
-          final currentCategories = _isExpense ? _expenseCategories : _incomeCategories;
-          if (!currentCategories.contains(_selectedCategory)) {
-            _selectedCategory = null;
-          }
-        }
-      });
-    } catch (e) {
-      print('Error loading categories: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading categories: $e')),
-      );
-    }
+    });
   }
 
-  Future<void> _saveExpenseIncome(GlobalKey<FormState> formKey) async {
-    if (formKey.currentState!.validate()) {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
+  Future<void> _saveTransaction(GlobalKey<FormState> formKey, bool isExpense) async {
+    print('Attempting to save transaction (isExpense: $isExpense)'); // Debug
+    if (!formKey.currentState!.validate()) {
+      print('Form validation failed'); // Debug
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please fill in all required fields')),
+        );
+      }
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print('No user logged in'); // Debug
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please log in to save transactions')),
         );
-        return;
       }
+      return;
+    }
 
-      final amount = double.tryParse(_amountController.text);
-      if (amount == null) {
+    final amount = double.tryParse(_amountController.text.trim());
+    if (amount == null) {
+      print('Invalid amount: ${_amountController.text}'); // Debug
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid amount entered')),
+          const SnackBar(content: Text('Enter a valid number for amount')),
         );
-        return;
       }
+      return;
+    }
 
-      final category = _selectedCategory == 'Custom' ? _categoryController.text.trim() : _selectedCategory;
-      if (category == null || category.isEmpty) {
+    final category = _categoryController.text.trim();
+    if (category.isEmpty) {
+      print('Empty category'); // Debug
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select or enter a category')),
+          const SnackBar(content: Text('Category cannot be empty')),
         );
-        return;
       }
+      return;
+    }
 
-      final note = _noteController.text;
-      final type = _isExpense ? 'expense' : 'income';
+    final note = _noteController.text.trim();
+    final type = isExpense ? 'expense' : 'income';
 
-      try {
-        // Save custom category to Firestore
-        if (_selectedCategory == 'Custom' && category.isNotEmpty) {
-          final categoriesCollection = FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .collection('categories');
-          if (_isExpense && !_expenseCategories.contains(category)) {
-            await categoriesCollection.add({
-              'name': category,
-              'type': 'expense',
-              'createdAt': Timestamp.now(),
-            });
-            setState(() {
-              _expenseCategories.insert(_expenseCategories.length - 1, category);
-            });
-          } else if (!_isExpense && !_incomeCategories.contains(category)) {
-            await categoriesCollection.add({
-              'name': category,
-              'type': 'income',
-              'createdAt': Timestamp.now(),
-            });
-            setState(() {
-              _incomeCategories.insert(_incomeCategories.length - 1, category);
-            });
-          }
+    final connectivityResult = await Connectivity().checkConnectivity();
+    final isOffline = connectivityResult.contains(ConnectivityResult.none);
+    print('Connectivity: ${isOffline ? 'Offline' : 'Online'}'); // Debug
+
+    final transactionData = {
+      'amount': amount,
+      'category': category,
+      'note': note,
+      'date': _selectedDate.toIso8601String(),
+      'type': type,
+      'userId': user.uid,
+    };
+
+    try {
+      if (isOffline) {
+        final prefs = await SharedPreferences.getInstance();
+        List<String> pending = prefs.getStringList('pending_transactions') ?? [];
+        pending.add(jsonEncode(transactionData));
+        await prefs.setStringList('pending_transactions', pending);
+        print('Saved offline: $transactionData'); // Debug
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Saved locally, will sync when online')),
+          );
+        }
+      } else {
+        // Save category
+        final categoriesRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('categories');
+        final exists = await categoriesRef
+            .where('name', isEqualTo: category)
+            .where('type', isEqualTo: type)
+            .limit(1)
+            .get();
+        if (exists.docs.isEmpty) {
+          await categoriesRef.add({
+            'name': category,
+            'type': type,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+          print('Added category: $category ($type)'); // Debug
         }
 
         // Save transaction
@@ -146,29 +142,122 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
           'type': type,
           'userId': user.uid,
         });
+        print('Saved online: $transactionData'); // Debug
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Transaction added successfully!')),
+        // Clear pending transactions
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('pending_transactions');
+        print('Cleared pending transactions'); // Debug
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Transaction added successfully!')),
+          );
+        }
+      }
+
+      // Clear form
+      setState(() {
+        _amountController.clear();
+        _categoryController.clear();
+        _noteController.clear();
+      });
+
+      // Navigate to TransactionList
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TransactionList(selectedDate: _selectedDate),
+          ),
         );
-
-        // Clear form
-        setState(() {
-          _amountController.clear();
-          _categoryController.clear();
-          _noteController.clear();
-          _selectedCategory = null;
-        });
-        Navigator.pop(context);
-      } catch (e) {
+      }
+    } catch (e, stackTrace) {
+      print('ERROR SAVING TRANSACTION: $e\n$stackTrace'); // Debug with stack trace
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text('Error saving transaction: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _syncPendingTransactions() async {
+    print('Checking for pending transactions'); // Debug
+    final prefs = await SharedPreferences.getInstance();
+    final pending = prefs.getStringList('pending_transactions') ?? [];
+    if (pending.isEmpty) {
+      print('No pending transactions'); // Debug
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print('No user logged in for sync'); // Debug
+      return;
+    }
+
+    final connectivityResult = await Connectivity().checkConnectivity();
+    if (connectivityResult.contains(ConnectivityResult.none)) {
+      print('Offline, skipping sync'); // Debug
+      return;
+    }
+
+    try {
+      for (final transactionJson in pending) {
+        final data = jsonDecode(transactionJson) as Map<String, dynamic>;
+        final dateStr = data['date'] as String?;
+        if (dateStr == null) {
+          print('Invalid date in pending transaction: $data'); // Debug
+          continue;
+        }
+        data['date'] = Timestamp.fromDate(DateTime.parse(dateStr));
+        final category = data['category'] as String;
+        final type = data['type'] as String;
+
+        // Save category
+        final categoriesRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('categories');
+        final exists = await categoriesRef
+            .where('name', isEqualTo: category)
+            .where('type', isEqualTo: type)
+            .limit(1)
+            .get();
+        if (exists.docs.isEmpty) {
+          await categoriesRef.add({
+            'name': category,
+            'type': type,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+          print('Synced category: $category ($type)'); // Debug
+        }
+
+        // Save transaction
+        await FirebaseFirestore.instance.collection('transactions').add(data);
+        print('Synced transaction: $data'); // Debug
+      }
+      // Clear pending transactions
+      await prefs.remove('pending_transactions');
+      print('Cleared pending transactions after sync'); // Debug
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Offline transactions synced!')),
+        );
+      }
+    } catch (e, stackTrace) {
+      print('ERROR SYNCING TRANSACTIONS: $e\n$stackTrace'); // Debug with stack trace
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error syncing transactions: $e')),
         );
       }
     }
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
+    final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2000),
@@ -178,23 +267,25 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       setState(() {
         _selectedDate = picked;
       });
+      print('Selected date: $_selectedDate'); // Debug
     }
   }
 
   @override
   void dispose() {
+    print('Disposing AddExpenseScreen'); // Debug
     _amountController.dispose();
     _categoryController.dispose();
     _noteController.dispose();
-    _customCategoryController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    print('Building AddExpenseScreen'); // Debug
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Expense/Income'),
+        title: const Text('Add Expense / Income'),
         backgroundColor: Colors.blueAccent,
       ),
       body: Padding(
@@ -203,10 +294,10 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
           length: 2,
           child: Column(
             children: [
-              TabBar(
+              const TabBar(
                 labelColor: Colors.blueAccent,
                 unselectedLabelColor: Colors.grey,
-                tabs: const [
+                tabs: [
                   Tab(text: 'Expense'),
                   Tab(text: 'Income'),
                 ],
@@ -214,8 +305,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               Expanded(
                 child: TabBarView(
                   children: [
-                    _buildTransactionForm(isExpense: true, formKey: _expenseFormKey),
-                    _buildTransactionForm(isExpense: false, formKey: _incomeFormKey),
+                    _buildTransactionForm(true, _expenseFormKey),
+                    _buildTransactionForm(false, _incomeFormKey),
                   ],
                 ),
               ),
@@ -226,29 +317,24 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     );
   }
 
-  Widget _buildTransactionForm({required bool isExpense, required GlobalKey<FormState> formKey}) {
-    final categories = isExpense ? _expenseCategories : _incomeCategories;
-
-    // Reset _selectedCategory if it’s invalid for the current tab
-    if (_selectedCategory != null && !categories.contains(_selectedCategory)) {
-      _selectedCategory = null;
-      _categoryController.clear();
-    }
-
+  Widget _buildTransactionForm(bool isExpense, GlobalKey<FormState> formKey) {
+    _isExpense = isExpense; // Ensure _isExpense is updated
+    print('Building form (isExpense: $isExpense)'); // Debug
     return Form(
       key: formKey,
       child: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           TextFormField(
             controller: _amountController,
-            keyboardType: TextInputType.number,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(
               labelText: 'Amount',
               border: OutlineInputBorder(),
             ),
             validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter an amount';
+              if (value == null || value.trim().isEmpty) {
+                return 'Enter amount';
               }
               if (double.tryParse(value) == null) {
                 return 'Enter a valid number';
@@ -257,61 +343,27 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
             },
           ),
           const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            initialValue: _selectedCategory,
+          TextFormField(
+            controller: _categoryController,
             decoration: const InputDecoration(
               labelText: 'Category',
               border: OutlineInputBorder(),
             ),
-            items: categories.map((category) {
-              return DropdownMenuItem<String>(
-                value: category,
-                child: Text(category),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                _isExpense = isExpense;
-                _selectedCategory = value;
-                if (value != 'Custom') {
-                  _categoryController.clear();
-                }
-              });
-              if (value == 'Custom') {
-                _showCustomCategoryDialog(context, isExpense);
-              }
-            },
             validator: (value) {
-              if (value == null) {
-                return 'Please select a category';
-              }
-              if (value == 'Custom' && _categoryController.text.trim().isEmpty) {
-                return 'Please enter a custom category';
+              if (value == null || value.trim().isEmpty) {
+                return 'Enter category';
               }
               return null;
             },
+            onChanged: (value) {
+              print('Entered category: $value'); // Debug
+            },
           ),
-          if (_selectedCategory == 'Custom') ...[
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _categoryController,
-              decoration: const InputDecoration(
-                labelText: 'Custom Category',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (_selectedCategory == 'Custom' && (value == null || value.trim().isEmpty)) {
-                  return 'Please enter a custom category';
-                }
-                return null;
-              },
-            ),
-          ],
           const SizedBox(height: 16),
           TextFormField(
             controller: _noteController,
             decoration: const InputDecoration(
-              labelText: 'Note',
+              labelText: 'Note (optional)',
               border: OutlineInputBorder(),
             ),
           ),
@@ -327,57 +379,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               backgroundColor: Colors.blueAccent,
               foregroundColor: Colors.white,
             ),
-            onPressed: () => _saveExpenseIncome(formKey),
+            onPressed: () => _saveTransaction(formKey, isExpense),
             child: Text(isExpense ? 'Save Expense' : 'Save Income'),
           ),
         ],
       ),
-    );
-  }
-
-  void _showCustomCategoryDialog(BuildContext context, bool isExpense) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Add Custom Category'),
-          content: TextField(
-            controller: _customCategoryController,
-            decoration: const InputDecoration(labelText: 'New Category'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                setState(() {
-                  _selectedCategory = null;
-                  _categoryController.clear();
-                });
-              },
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                final newCategory = _customCategoryController.text.trim();
-                if (newCategory.isNotEmpty) {
-                  setState(() {
-                    if (isExpense && !_expenseCategories.contains(newCategory)) {
-                      _expenseCategories.insert(_expenseCategories.length - 1, newCategory);
-                    } else if (!isExpense && !_incomeCategories.contains(newCategory)) {
-                      _incomeCategories.insert(_incomeCategories.length - 1, newCategory);
-                    }
-                    _selectedCategory = 'Custom';
-                    _categoryController.text = newCategory;
-                  });
-                }
-                _customCategoryController.clear();
-                Navigator.pop(context);
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        );
-      },
     );
   }
 }

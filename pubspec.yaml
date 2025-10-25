@@ -19,7 +19,9 @@ dependencies:
   uuid: ^4.0.0
   http: ^1.0.0
   flutter_local_notifications: ^17.0.0
-  fl_chart: ^0.69.0 # Added for pie charts
+  fl_chart: ^0.69.0
+  connectivity_plus: ^6.0.3 # Added for offline connectivity checking
+  shared_preferences: ^2.2.2 # Added for local storage backup
 
 dev_dependencies:
   flutter_test:
