@@ -8,9 +8,34 @@ import 'package:intl/intl.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart'; // Import the package
+
+class Transaction {
+  final String? id;
+  final double amount;
+  final String category;
+  final String note;
+  final DateTime date;
+  final String type;
+  final String userId;
+  final String? receiptUrl;
+
+  Transaction({
+    this.id,
+    required this.amount,
+    required this.category,
+    required this.note,
+    required this.date,
+    required this.type,
+    required this.userId,
+    this.receiptUrl,
+  });
+}
 
 class AddExpenseScreen extends StatefulWidget {
-  const AddExpenseScreen({super.key});
+  final Transaction? transaction;
+
+  const AddExpenseScreen({super.key, this.transaction});
 
   @override
   State<AddExpenseScreen> createState() => _AddExpenseScreenState();
@@ -25,19 +50,29 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   DateTime _selectedDate = DateTime.now();
   bool _isExpense = true;
   File? _selectedImage;
+  String? _existingReceiptUrl;
   final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
-    print('AddExpenseScreen: Initialized'); // Debug
+    print('AddExpenseScreen: Initialized');
+    if (widget.transaction != null) {
+      _amountController.text = widget.transaction!.amount.toString();
+      _categoryController.text = widget.transaction!.category;
+      _noteController.text = widget.transaction!.note;
+      _selectedDate = widget.transaction!.date;
+      _isExpense = widget.transaction!.type == 'expense';
+      _existingReceiptUrl = widget.transaction!.receiptUrl;
+      print('AddExpenseScreen: Editing transaction: ${widget.transaction!.id}');
+    }
     _listenToConnectivity();
     _syncPendingTransactions();
   }
 
   void _listenToConnectivity() {
     Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> result) {
-      print('AddExpenseScreen: Connectivity changed: $result'); // Debug
+      print('AddExpenseScreen: Connectivity changed: $result');
       if (!result.contains(ConnectivityResult.none)) {
         _syncPendingTransactions();
       }
@@ -50,13 +85,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       if (pickedFile != null) {
         setState(() {
           _selectedImage = File(pickedFile.path);
+          _existingReceiptUrl = null; // Clear existing URL if new image is picked
         });
-        print('AddExpenseScreen: Image picked: ${pickedFile.path}'); // Debug
+        print('AddExpenseScreen: Image picked: ${pickedFile.path}');
       } else {
-        print('AddExpenseScreen: No image selected'); // Debug
+        print('AddExpenseScreen: No image selected');
       }
     } catch (e) {
-      print('AddExpenseScreen: Image picker error: $e'); // Debug
+      print('AddExpenseScreen: Image picker error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error picking image: $e')),
@@ -74,18 +110,18 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
           .child('$transactionId.jpg');
       final uploadTask = await storageRef.putFile(image);
       final downloadUrl = await uploadTask.ref.getDownloadURL();
-      print('AddExpenseScreen: Image uploaded: $downloadUrl'); // Debug
+      print('AddExpenseScreen: Image uploaded: $downloadUrl');
       return downloadUrl;
     } catch (e) {
-      print('AddExpenseScreen: Image upload error: $e'); // Debug
+      print('AddExpenseScreen: Image upload error: $e');
       return null;
     }
   }
 
   Future<void> _saveTransaction(GlobalKey<FormState> formKey, bool isExpense) async {
-    print('AddExpenseScreen: Saving transaction (isExpense: $isExpense)'); // Debug
+    print('AddExpenseScreen: Saving transaction (isExpense: $isExpense)');
     if (!formKey.currentState!.validate()) {
-      print('AddExpenseScreen: Form validation failed'); // Debug
+      print('AddExpenseScreen: Form validation failed');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please fill in all required fields')),
@@ -96,7 +132,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      print('AddExpenseScreen: No user logged in'); // Debug
+      print('AddExpenseScreen: No user logged in');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please log in to save transactions')),
@@ -107,7 +143,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
     final amount = double.tryParse(_amountController.text.trim());
     if (amount == null || amount <= 0) {
-      print('AddExpenseScreen: Invalid amount: ${_amountController.text}'); // Debug
+      print('AddExpenseScreen: Invalid amount: ${_amountController.text}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Enter a valid positive number for amount')),
@@ -118,7 +154,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
     final category = _categoryController.text.trim();
     if (category.isEmpty) {
-      print('AddExpenseScreen: Empty category'); // Debug
+      print('AddExpenseScreen: Empty category');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Category cannot be empty')),
@@ -132,16 +168,16 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
     final connectivityResult = await Connectivity().checkConnectivity();
     final isOffline = connectivityResult.contains(ConnectivityResult.none);
-    print('AddExpenseScreen: Connectivity: ${isOffline ? 'Offline' : 'Online'}'); // Debug
+    print('AddExpenseScreen: Connectivity: ${isOffline ? 'Offline' : 'Online'}');
 
     final transactionData = {
       'amount': amount,
       'category': category,
       'note': note,
-      'date': _selectedDate.toIso8601String(),
+      'date': Timestamp.fromDate(_selectedDate),
       'type': type,
       'userId': user.uid,
-      'receiptUrl': null, // Placeholder for receipt URL
+      'receiptUrl': _existingReceiptUrl,
     };
 
     try {
@@ -151,10 +187,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         final pendingTransaction = {
           'transaction': transactionData,
           'imagePath': _selectedImage?.path,
+          'id': widget.transaction?.id,
         };
         pending.add(jsonEncode(pendingTransaction));
         await prefs.setStringList('pending_transactions', pending);
-        print('AddExpenseScreen: Saved offline: $pendingTransaction'); // Debug
+        print('AddExpenseScreen: Saved offline: $pendingTransaction');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Saved locally, will sync when online')),
@@ -176,40 +213,42 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
             'type': type,
             'createdAt': FieldValue.serverTimestamp(),
           });
-          print('AddExpenseScreen: Added category: $category ($type)'); // Debug
+          print('AddExpenseScreen: Added category: $category ($type)');
         }
 
-        final docRef = await FirebaseFirestore.instance.collection('transactions').add({
-          'amount': amount,
-          'category': category,
-          'note': note,
-          'date': Timestamp.fromDate(_selectedDate),
-          'type': type,
-          'userId': user.uid,
-          'receiptUrl': null, // Will update if image exists
-        });
-
-        String? receiptUrl;
+        String? receiptUrl = _existingReceiptUrl;
         if (_selectedImage != null) {
-          receiptUrl = await _uploadImage(_selectedImage!, user.uid, docRef.id);
-          if (receiptUrl != null) {
+          final transactionId = widget.transaction?.id ?? DateTime.now().millisecondsSinceEpoch.toString();
+          receiptUrl = await _uploadImage(_selectedImage!, user.uid, transactionId);
+          print('AddExpenseScreen: New receiptUrl: $receiptUrl');
+        }
+
+        if (widget.transaction != null && widget.transaction!.id != null) {
+          final docRef = FirebaseFirestore.instance.collection('transactions').doc(widget.transaction!.id);
+          await docRef.update({
+            ...transactionData,
+            'receiptUrl': receiptUrl,
+          });
+          print('AddExpenseScreen: Updated transaction: ${widget.transaction!.id} with receiptUrl: $receiptUrl');
+        } else {
+          final docRef = await FirebaseFirestore.instance.collection('transactions').add({
+            ...transactionData,
+            'receiptUrl': receiptUrl,
+          });
+          print('AddExpenseScreen: Added new transaction: ${docRef.id}');
+          if (receiptUrl != null && _selectedImage != null) {
             await docRef.update({'receiptUrl': receiptUrl});
-            print('AddExpenseScreen: Updated transaction with receiptUrl: $receiptUrl'); // Debug
+            print('AddExpenseScreen: Updated transaction with receiptUrl: $receiptUrl');
           }
         }
 
-        print('AddExpenseScreen: Saved online: ${{
-          ...transactionData,
-          'receiptUrl': receiptUrl,
-        }}'); // Debug
-
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('pending_transactions');
-        print('AddExpenseScreen: Cleared pending transactions'); // Debug
+        print('AddExpenseScreen: Cleared pending transactions');
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Transaction added successfully!')),
+            const SnackBar(content: Text('Transaction saved successfully!')),
           );
         }
       }
@@ -219,13 +258,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         _categoryController.clear();
         _noteController.clear();
         _selectedImage = null;
+        _existingReceiptUrl = null;
       });
 
       if (mounted) {
         Navigator.pop(context);
       }
     } catch (e, stackTrace) {
-      print('AddExpenseScreen: ERROR SAVING TRANSACTION: $e\n$stackTrace'); // Debug
+      print('AddExpenseScreen: ERROR SAVING TRANSACTION: $e\n$stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error saving transaction: $e')),
@@ -235,23 +275,23 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   }
 
   Future<void> _syncPendingTransactions() async {
-    print('AddExpenseScreen: Checking for pending transactions'); // Debug
+    print('AddExpenseScreen: Checking for pending transactions');
     final prefs = await SharedPreferences.getInstance();
     final pending = prefs.getStringList('pending_transactions') ?? [];
     if (pending.isEmpty) {
-      print('AddExpenseScreen: No pending transactions'); // Debug
+      print('AddExpenseScreen: No pending transactions');
       return;
     }
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      print('AddExpenseScreen: No user logged in for sync'); // Debug
+      print('AddExpenseScreen: No user logged in for sync');
       return;
     }
 
     final connectivityResult = await Connectivity().checkConnectivity();
     if (connectivityResult.contains(ConnectivityResult.none)) {
-      print('AddExpenseScreen: Offline, skipping sync'); // Debug
+      print('AddExpenseScreen: Offline, skipping sync');
       return;
     }
 
@@ -260,17 +300,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         final pendingTransaction = jsonDecode(transactionJson) as Map<String, dynamic>;
         final transactionData = pendingTransaction['transaction'] as Map<String, dynamic>;
         final imagePath = pendingTransaction['imagePath'] as String?;
-        final dateStr = transactionData['date'] as String?;
-        if (dateStr == null) {
-          print('AddExpenseScreen: Invalid date in pending transaction: $transactionData'); // Debug
-          continue;
-        }
-        try {
-          transactionData['date'] = Timestamp.fromDate(DateTime.parse(dateStr));
-        } catch (e) {
-          print('AddExpenseScreen: Failed to parse date: $dateStr'); // Debug
-          continue;
-        }
+        final transactionId = pendingTransaction['id'] as String?;
+        transactionData['date'] = Timestamp.fromDate(DateTime.parse(transactionData['date']));
         final category = transactionData['category'] as String? ?? 'Unknown';
         final type = transactionData['type'] as String? ?? 'unknown';
 
@@ -289,37 +320,43 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
             'type': type,
             'createdAt': FieldValue.serverTimestamp(),
           });
-          print('AddExpenseScreen: Synced category: $category ($type)'); // Debug
+          print('AddExpenseScreen: Synced category: $category ($type)');
         }
-
-        final docRef = await FirebaseFirestore.instance.collection('transactions').add({
-          ...transactionData,
-          'receiptUrl': null, // Will update if image exists
-        });
 
         String? receiptUrl;
         if (imagePath != null && File(imagePath).existsSync()) {
-          receiptUrl = await _uploadImage(File(imagePath), user.uid, docRef.id);
-          if (receiptUrl != null) {
-            await docRef.update({'receiptUrl': receiptUrl});
-            print('AddExpenseScreen: Synced transaction with receiptUrl: $receiptUrl'); // Debug
-          }
+          final id = transactionId ?? DateTime.now().millisecondsSinceEpoch.toString();
+          receiptUrl = await _uploadImage(File(imagePath), user.uid, id);
+          print('AddExpenseScreen: Synced receiptUrl: $receiptUrl');
         }
 
-        print('AddExpenseScreen: Synced transaction: ${{
-          ...transactionData,
-          'receiptUrl': receiptUrl,
-        }}'); // Debug
+        if (transactionId != null) {
+          final docRef = FirebaseFirestore.instance.collection('transactions').doc(transactionId);
+          await docRef.update({
+            ...transactionData,
+            'receiptUrl': receiptUrl,
+          });
+          print('AddExpenseScreen: Synced updated transaction: $transactionId');
+        } else {
+          final docRef = await FirebaseFirestore.instance.collection('transactions').add({
+            ...transactionData,
+            'receiptUrl': receiptUrl,
+          });
+          print('AddExpenseScreen: Synced new transaction: ${docRef.id}');
+          if (receiptUrl != null) {
+            await docRef.update({'receiptUrl': receiptUrl});
+          }
+        }
       }
       await prefs.remove('pending_transactions');
-      print('AddExpenseScreen: Cleared pending transactions after sync'); // Debug
+      print('AddExpenseScreen: Cleared pending transactions after sync');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Offline transactions synced!')),
         );
       }
     } catch (e, stackTrace) {
-      print('AddExpenseScreen: ERROR SYNCING TRANSACTIONS: $e\n$stackTrace'); // Debug
+      print('AddExpenseScreen: ERROR SYNCING TRANSACTIONS: $e\n$stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error syncing transactions: $e')),
@@ -339,13 +376,13 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       setState(() {
         _selectedDate = picked;
       });
-      print('AddExpenseScreen: Selected date: $_selectedDate'); // Debug
+      print('AddExpenseScreen: Selected date: $_selectedDate');
     }
   }
 
   @override
   void dispose() {
-    print('AddExpenseScreen: Disposing'); // Debug
+    print('AddExpenseScreen: Disposing');
     _amountController.dispose();
     _categoryController.dispose();
     _noteController.dispose();
@@ -354,10 +391,10 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('AddExpenseScreen: Building'); // Debug
+    print('AddExpenseScreen: Building');
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Expense / Income'),
+        title: Text(widget.transaction != null ? 'Edit Transaction' : 'Add Expense / Income'),
         backgroundColor: Colors.blueAccent,
       ),
       body: Padding(
@@ -391,7 +428,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
   Widget _buildTransactionForm(bool isExpense, GlobalKey<FormState> formKey) {
     _isExpense = isExpense;
-    print('AddExpenseScreen: Building form (isExpense: $isExpense)'); // Debug
+    print('AddExpenseScreen: Building form (isExpense: $isExpense)');
     return Form(
       key: formKey,
       child: ListView(
@@ -429,7 +466,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               return null;
             },
             onChanged: (value) {
-              print('AddExpenseScreen: Entered category: $value'); // Debug
+              print('AddExpenseScreen: Entered category: $value');
             },
           ),
           const SizedBox(height: 16),
@@ -449,9 +486,13 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
           const SizedBox(height: 16),
           ListTile(
             title: Text(
-              _selectedImage == null ? 'Add Receipt Photo' : 'Receipt Photo Selected',
+              _selectedImage != null
+                  ? 'Receipt Photo Selected'
+                  : _existingReceiptUrl != null
+                      ? 'Existing Receipt'
+                      : 'Add Receipt Photo',
               style: TextStyle(
-                color: _selectedImage == null ? Colors.grey : Colors.green,
+                color: _selectedImage != null || _existingReceiptUrl != null ? Colors.green : Colors.grey,
               ),
             ),
             trailing: const Icon(Icons.camera_alt),
@@ -466,6 +507,20 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               fit: BoxFit.cover,
             ),
           ],
+          if (_existingReceiptUrl != null && _selectedImage == null) ...[
+            const SizedBox(height: 16),
+            CachedNetworkImage( // Correct usage as a widget
+              imageUrl: _existingReceiptUrl!,
+              height: 100,
+              width: 100,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => const CircularProgressIndicator(),
+              errorWidget: (context, url, error) {
+                print('AddExpenseScreen: Existing receipt load error: $error');
+                return const Icon(Icons.error, color: Colors.red);
+              },
+            ),
+          ],
           const SizedBox(height: 16),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -473,7 +528,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               foregroundColor: Colors.white,
             ),
             onPressed: () => _saveTransaction(formKey, isExpense),
-            child: Text(isExpense ? 'Save Expense' : 'Save Income'),
+            child: Text(widget.transaction != null ? 'Update Transaction' : 'Save Transaction'),
           ),
         ],
       ),
