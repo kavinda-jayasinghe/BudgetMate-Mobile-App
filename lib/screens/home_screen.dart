@@ -88,63 +88,63 @@ Future<void> updateTransactionsWithUserIdAndDate() async {
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Budget Mate'),
-        centerTitle: true,
-        backgroundColor: Colors.blueAccent, // Match StatisticsScreen styling
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.pie_chart, color: Colors.white),
-            tooltip: 'View Statistics',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => StatisticsScreen(selectedDate: _selectedDate),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            tooltip: 'Logout',
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const AuthPage()),
-              );
-            },
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(50),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_left, color: Colors.white),
-                  onPressed: _previousMonth,
-                ),
-                Text(
-                  DateFormat.yMMMM().format(_selectedDate),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.arrow_right, color: Colors.white),
-                  onPressed: _nextMonth,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      // appBar: AppBar(
+      //   title: const Text('Budget Mate'),
+      //   centerTitle: true,
+      //   backgroundColor: Colors.blueAccent, // Match StatisticsScreen styling
+      //   actions: [
+      //     IconButton(
+      //       icon: const Icon(Icons.pie_chart, color: Colors.white),
+      //       tooltip: 'View Statistics',
+      //       onPressed: () {
+      //         Navigator.push(
+      //           context,
+      //           MaterialPageRoute(
+      //             builder: (context) => StatisticsScreen(selectedDate: _selectedDate),
+      //           ),
+      //         );
+      //       },
+      //     ),
+      //     IconButton(
+      //       icon: const Icon(Icons.logout, color: Colors.white),
+      //       tooltip: 'Logout',
+      //       onPressed: () async {
+      //         await FirebaseAuth.instance.signOut();
+      //         Navigator.pushReplacement(
+      //           context,
+      //           MaterialPageRoute(builder: (context) => const AuthPage()),
+      //         );
+      //       },
+      //     ),
+      //   ],
+      //   bottom: PreferredSize(
+      //     preferredSize: const Size.fromHeight(50),
+      //     child: Padding(
+      //       padding: const EdgeInsets.symmetric(vertical: 8.0),
+      //       child: Row(
+      //         mainAxisAlignment: MainAxisAlignment.center,
+      //         children: [
+      //           IconButton(
+      //             icon: const Icon(Icons.arrow_left, color: Colors.white),
+      //             onPressed: _previousMonth,
+      //           ),
+      //           Text(
+      //             DateFormat.yMMMM().format(_selectedDate),
+      //             style: const TextStyle(
+      //               fontSize: 18,
+      //               fontWeight: FontWeight.bold,
+      //               color: Colors.white,
+      //             ),
+      //           ),
+      //           IconButton(
+      //             icon: const Icon(Icons.arrow_right, color: Colors.white),
+      //             onPressed: _nextMonth,
+      //           ),
+      //         ],
+      //       ),
+      //     ),
+      //   ),
+      // ),
       body: Column(
         children: [
           // const SizedBox(height: 16),
