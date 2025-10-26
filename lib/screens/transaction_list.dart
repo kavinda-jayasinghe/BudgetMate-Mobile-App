@@ -459,7 +459,7 @@ class _TransactionListState extends State<TransactionList> with SingleTickerProv
             backgroundColor: Colors.indigo,
             elevation: 0,
             title: const Text(
-              'Transactions',
+              'Budget Mate',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
